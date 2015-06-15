@@ -1,0 +1,98 @@
+---
+title: "Activity quality from activity monitors"
+author: "Pablo Salvador"
+date: "Thursday, June 11, 2015"
+output: html_document
+---
+
+This is a study to predict the manner in which six subjects perform the exercise by using data from accelerometers on the belt, forearm, arm, and dumbell of the participants. The data comes from "http://groupware.les.inf.puc-rio.br/har".
+
+For this purpose the data "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv" has been read and several colums has been selected for the study. The selected colums are the variables related to the measured of the acelerometers, gyroscopes and magnetometers (along the x,y and z axes), named as:
+
+
+
+
+```{r, echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+library(caret)
+library(rpart)
+library(randomForest)
+setwd('F:/coursera/hopkinsUniversity/08-PracticalMachineLearning/project/')
+
+datos<-read.table("pml-training.csv",sep=',',header=TRUE,na.strings=c("NA", "#DIV/0!"))
+
+datos<-data.frame(datos[,8:11],datos[,37:49],datos[,60:68],datos[,84:86],datos[,115:124],datos[,151:160])
+colnames(datos)
+
+inTrain<-createDataPartition(y=datos$classe,p=0.7,list=FALSE)
+training<-datos[inTrain,]
+testing<-datos[-inTrain,]
+
+```
+
+The first thing to do is divide the data into a training set and a test set, we select a 70% of the data for the training and 30% for the test. Once the data is divide, we start an exploratory analysis with the training dataset.
+
+In the next plot we can see the correlation between those variables and the variable "class" that we want to predict.
+
+
+```{r,echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+c<-cor(training[1:48],as.numeric(training$classe))
+plot(c,main="Correlation between class and the predictors variables")
+```
+
+The correlation is low for all the data. Now we are going to start to developed the learning algorithm. 
+For this purpose we use the training data set and perform two kinds of machine learning algorithms "trees" and "random forest". After that we run these models with the test dataset in order to analyze the results.
+
+
+```{r, echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+set.seed(1234)
+modelFitRpart<-train(classe ~ ., data=training,na.action=na.omit,method='rpart')
+modelFitRfor<-train(classe ~ ., data=training,na.action=na.omit,method='rf')
+
+predModelFitRpart<-predict(modelFitRpart,newdata=testing)
+predModelFitRfor<-predict(modelFitRfor,newdata=testing)
+```
+
+
+In first place we plot the classification tree:
+```{r,echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+plot(modelFitRpart$finalModel,uniform=TRUE,main="Classification tree")
+text(modelFitRpart$finalModel,use.n=TRUE,all=TRUE,cex=0.6)
+```
+
+It works pretty fast, but the confusion matrix is not favourable:
+```{r,echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+confusionMatrix(predModelFitRpart,testing$classe)
+```
+
+But in the case of the random forest the result, looking at the confusion matrix are quite satisfactory:
+```{r, echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+confusionMatrix(predModelFitRfor,testing$classe)
+```
+
+We can plot the results of this confusion matrix:
+
+```{r, echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+qplot(predModelFitRfor,testing$classe)
+```
+
+
+
+In order to simplify the model we are going to try again random forest, but in this ocasion only with the variables choosed by the classification tree. Those variables are roll_belt, pitch_forearm, magnet_dumbbell_y and roll_forearm. We subset the data again in new training and testing sets with only the mentioned variables, and perform again the random forest method. In this case the confusion matrix (perform with the new testing set) is:
+
+```{r, echo=TRUE,warning=FALSE,message = FALSE,cache = FALSE}
+datos2<-data.frame(datos$roll_belt,datos$pitch_forearm,datos$magnet_dumbbell_y,datos$roll_forearm,datos$classe)
+inTrain2<-createDataPartition(y=datos2$datos.classe,p=0.7,list=FALSE)
+training2<-datos[inTrain2,]
+testing2<-datos[-inTrain2,]
+modelFitRfor2<-train(classe ~ ., data=training2,na.action=na.omit,method='rf')
+predModelFitRfor2<-predict(modelFitRfor2,newdata=testing2)
+confusionMatrix(predModelFitRfor2,testing2$classe)
+```
+
+
+As we can see if we compare the confusion matrix of the last random forest approach with the first one, this model is worst, but simple (simple, because it has a smaller number of variables included).
+
+As conclussions we can say that random forest is the best approach to solve the problem and we can use all the variables in order to perform the calculus in the best possible way, or we can reduce the number of variables in order to have a simplified solution.
+
+
+
